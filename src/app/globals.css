@@ -1,26 +1,166 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 45 20% 97%;
+    --foreground: 30 10% 12%;
+
+    --card: 45 30% 99%;
+    --card-foreground: 30 10% 12%;
+
+    --popover: 45 30% 99%;
+    --popover-foreground: 30 10% 12%;
+
+    --primary: 24 95% 53%;
+    --primary-foreground: 45 30% 99%;
+
+    --secondary: 45 15% 92%;
+    --secondary-foreground: 30 10% 20%;
+
+    --muted: 45 10% 90%;
+    --muted-foreground: 30 8% 45%;
+
+    --accent: 24 90% 96%;
+    --accent-foreground: 24 95% 35%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 60% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 40 15% 88%;
+    --input: 40 15% 88%;
+    --ring: 24 95% 53%;
+
+    --radius: 0.25rem;
+
+    --upload-zone: 45 20% 96%;
+    --upload-zone-hover: 24 60% 97%;
+    --upload-zone-border: 40 15% 80%;
+    --upload-zone-border-active: 24 95% 53%;
+
+    --ad-background: 45 15% 94%;
+    --ad-border: 40 15% 85%;
+
+    --sidebar-background: 45 20% 97%;
+    --sidebar-foreground: 30 10% 30%;
+    --sidebar-primary: 24 95% 53%;
+    --sidebar-primary-foreground: 45 30% 99%;
+    --sidebar-accent: 45 15% 92%;
+    --sidebar-accent-foreground: 30 10% 20%;
+    --sidebar-border: 40 15% 88%;
+    --sidebar-ring: 24 95% 53%;
+  }
+
+  .dark {
+    --background: 30 15% 8%;
+    --foreground: 45 20% 95%;
+
+    --card: 30 15% 11%;
+    --card-foreground: 45 20% 95%;
+
+    --popover: 30 15% 11%;
+    --popover-foreground: 45 20% 95%;
+
+    --primary: 24 95% 55%;
+    --primary-foreground: 30 15% 8%;
+
+    --secondary: 30 12% 18%;
+    --secondary-foreground: 45 20% 90%;
+
+    --muted: 30 12% 18%;
+    --muted-foreground: 40 10% 55%;
+
+    --accent: 24 50% 18%;
+    --accent-foreground: 24 90% 70%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 50% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --border: 30 12% 20%;
+    --input: 30 12% 20%;
+    --ring: 24 95% 55%;
+
+    --upload-zone: 30 15% 10%;
+    --upload-zone-hover: 24 40% 14%;
+    --upload-zone-border: 30 12% 22%;
+    --upload-zone-border-active: 24 95% 55%;
+
+    --ad-background: 30 15% 10%;
+    --ad-border: 30 12% 20%;
+
+    --sidebar-background: 30 15% 8%;
+    --sidebar-foreground: 45 20% 90%;
+    --sidebar-primary: 24 95% 55%;
+    --sidebar-primary-foreground: 30 15% 8%;
+    --sidebar-accent: 30 12% 15%;
+    --sidebar-accent-foreground: 45 20% 90%;
+    --sidebar-border: 30 12% 20%;
+    --sidebar-ring: 24 95% 55%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    @apply font-bold tracking-tight;
+  }
+
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .upload-zone {
+    @apply bg-[hsl(var(--upload-zone))] border-2 border-dashed border-[hsl(var(--upload-zone-border))] transition-all duration-150;
+  }
+
+  .upload-zone-active {
+    @apply bg-[hsl(var(--upload-zone-hover))] border-[hsl(var(--upload-zone-border-active))];
+  }
+
+  .ad-placeholder {
+    @apply bg-[hsl(var(--ad-background))] border border-[hsl(var(--ad-border))];
+  }
+
+  .font-display {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    @apply font-extrabold;
+  }
+
+  .font-sans {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .container-tight {
+    @apply max-w-2xl mx-auto px-5 sm:px-6;
+  }
+
+  .container-wide {
+    @apply max-w-5xl mx-auto px-5 sm:px-6;
+  }
 }

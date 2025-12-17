@@ -1,65 +1,227 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+import Header from "@/components/Header";
+import UploadZone from "@/components/UploadZone";
+import FormatSelector from "@/components/FormatSelector";
+import ConversionProgress from "@/components/ConversionProgress";
+import DownloadSection from "@/components/DownloadSection";
+import TrustSection from "@/components/TrustSection";
+import SupportedFormats from "@/components/SupportedFormats";
+import UrlImport from "@/components/UrlImport";
+import AdPlaceholder from "@/components/AdPlaceholder";
+import ErrorState from "@/components/ErrorStates";
+import Footer from "@/components/Footer";
+import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useConversion, ConversionStatus } from "@/hooks/use-conversion";
+
+type AppState = "upload" | "converting" | "success" | "error";
+type ErrorType = "unsupported" | "too-large" | "failed";
+
+const queryClient = new QueryClient();
 
 export default function Home() {
+  const { status, progress, params, convert, reset } = useConversion();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<ErrorType>("failed");
+
+  // Derive app state from hook status
+  const appState: AppState =
+    status === "idle" ? "upload" :
+      status === "uploading" || status === "converting" ? "converting" :
+        status === "success" ? "success" :
+          status === "error" ? "error" : "upload";
+
+  // Effect to handle external hook resets if needed, or just sync
+  useEffect(() => {
+    if (status === "idle" && selectedFile) {
+      // if hook reset but we have file, maybe valid?
+    }
+  }, [status]);
+
+  // Constants
+  const SERVER_MAX_SIZE = 4.5 * 1024 * 1024; // 4.5MB Vercel limit
+  const CLIENT_MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2GB (Browser limit approx)
+
+  const isServerConversion = (file: File | null, format: string | null) => {
+    if (!file) return false;
+    // Images and PDF targets (if we add PDF input later) go to server
+    if (file.type.startsWith("image/") || format === "pdf") return true;
+    return false;
+  };
+
+  const handleFileSelect = (file: File) => {
+    // Initial check - we don't know format yet, but we allow upload if it *could* be valid.
+    // If it's video/audio (usually large), we likely handle it client side, so allow.
+    // If it's image (usually small), we might handle server side.
+    // But we don't know target format yet. 
+    // However, Image -> Image/PDF is server. Image -> anything else is unlikely.
+    // Video -> anything is client.
+
+    // So: If Image > 4.5MB, warn immediately? 
+    // Yes, because Image->PDF/Image is server side.
+    if (file.type.startsWith("image/") && file.size > SERVER_MAX_SIZE) {
+      setErrorType("too-large");
+      // We set file to null or keep it to show error?
+      // Design choice: Show error state.
+      setSelectedFile(null);
+      // But we need to switch UI to error, which requires state update.
+      // effectiveAppState handles it if we store errorType properly.
+      // setAppState("error"); // Use explicit state for error to be safe
+      return;
+    }
+
+    // If Video/Audio and huge
+    if ((file.type.startsWith("video/") || file.type.startsWith("audio/")) && file.size > CLIENT_MAX_SIZE) {
+      setErrorType("too-large");
+      setSelectedFile(null);
+      // setAppState("error");
+      return;
+    }
+
+    setSelectedFile(file);
+    reset();
+    setErrorType("failed");
+  };
+
+  const effectiveAppState = (selectedFile === null && errorType === "too-large") ? "error" : appState;
+
+  const handleClearFile = () => {
+    setSelectedFile(null);
+    setSelectedFormat(null);
+    reset();
+    setErrorType("failed");
+  };
+
+  const handleConvert = () => {
+    if (!selectedFile || !selectedFormat) return;
+    convert(selectedFile, selectedFormat);
+  };
+
+  const handleDownload = () => {
+    if (params.resultUrl) {
+      const a = document.createElement('a');
+      a.href = params.resultUrl;
+      a.download = params.resultFilename || 'converted';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
+  const handleConvertAnother = () => {
+    setSelectedFile(null);
+    setSelectedFormat(null);
+    reset();
+  };
+
+  const handleRetry = () => {
+    reset();
+    setErrorType("failed");
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <div className="min-h-screen flex flex-col bg-background">
+          <Header />
+
+          <main className="flex-1">
+            {/* Hero */}
+            <section className="py-16 sm:py-24">
+              <div className="container-tight">
+                <div className="text-center mb-12">
+                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground mb-4 leading-tight">
+                    Convert <span className="text-primary">Your Files</span>
+                    <br />with Ease
+                  </h1>
+                  <p className="text-lg text-muted-foreground max-w-md mx-auto">
+                    Free, fast, and private file conversion. No account needed, no hassle.
+                  </p>
+                </div>
+
+                {/* Converter */}
+                <div className="space-y-5">
+                  {effectiveAppState === "error" && (
+                    <ErrorState
+                      type={errorType}
+                      onRetry={handleRetry}
+                      onSelectDifferent={handleClearFile}
+                    />
+                  )}
+
+                  {effectiveAppState === "success" && selectedFile && (
+                    <DownloadSection
+                      fileName={params.resultFilename || `converted.${selectedFormat}`}
+                      fileSize="Unknown" // Client-side conversion doesn't always give size easily without blob inspection
+                      onDownload={handleDownload}
+                      onConvertAnother={handleConvertAnother}
+                    />
+                  )}
+
+                  {effectiveAppState === "converting" && (
+                    <ConversionProgress
+                      status="converting"
+                      progress={progress}
+                      fileName={selectedFile?.name}
+                    />
+                  )}
+
+                  {effectiveAppState === "upload" && (
+                    <>
+                      <UploadZone
+                        onFileSelect={handleFileSelect}
+                        selectedFile={selectedFile}
+                        onClear={handleClearFile}
+                      />
+
+                      {selectedFile && (
+                        <FormatSelector
+                          selectedFormat={selectedFormat}
+                          onSelectFormat={setSelectedFormat}
+                        />
+                      )}
+
+                      {selectedFile && selectedFormat && (
+                        <Button
+                          variant="hero"
+                          size="lg"
+                          onClick={handleConvert}
+                          className="w-full rounded-xl"
+                        >
+                          Convert to {selectedFormat.toUpperCase()}
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-12">
+                  <AdPlaceholder size="banner" />
+                </div>
+              </div>
+            </section>
+
+            <SupportedFormats />
+            <TrustSection />
+
+            <div className="container-wide pb-12">
+              <AdPlaceholder size="rectangle" />
+            </div>
+          </main>
+
+          <Footer />
+          <Toaster />
+          <Sonner />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
