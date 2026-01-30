@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { toast } from "sonner";
 import { generateOutputFilename } from "@/lib/conversion-matrix";
+
+// Dynamic imports for FFmpeg to avoid bundling issues
+type FFmpegType = typeof import("@ffmpeg/ffmpeg").FFmpeg;
+type FetchFileType = typeof import("@ffmpeg/util").fetchFile;
+type ToBlobURLType = typeof import("@ffmpeg/util").toBlobURL;
 
 export type ConversionStatus = "idle" | "uploading" | "converting" | "success" | "error";
 
@@ -29,11 +32,24 @@ export function useConversion(): UseConversionReturn {
     const [resultUrl, setResultUrl] = useState<string | null>(null);
     const [resultFilename, setResultFilename] = useState<string | null>(null);
 
-    // Lazy init FFmpeg
-    const ffmpegRef = useRef<FFmpeg | null>(null);
+    // Lazy init FFmpeg with dynamic imports
+    const ffmpegRef = useRef<any>(null);
+    const ffmpegModuleRef = useRef<{ FFmpeg: FFmpegType; fetchFile: FetchFileType; toBlobURL: ToBlobURLType } | null>(null);
 
-    const getFfmpeg = () => {
+    const loadFFmpegModule = async () => {
+        if (!ffmpegModuleRef.current) {
+            const [{ FFmpeg }, { fetchFile, toBlobURL }] = await Promise.all([
+                import("@ffmpeg/ffmpeg"),
+                import("@ffmpeg/util")
+            ]);
+            ffmpegModuleRef.current = { FFmpeg, fetchFile, toBlobURL };
+        }
+        return ffmpegModuleRef.current;
+    };
+
+    const getFfmpeg = async () => {
         if (!ffmpegRef.current) {
+            const { FFmpeg } = await loadFFmpegModule();
             ffmpegRef.current = new FFmpeg();
         }
         return ffmpegRef.current;
@@ -98,96 +114,16 @@ export function useConversion(): UseConversionReturn {
     };
 
     const convertVideo = async (file: File, format: string) => {
-        // Check file size - route to server for small files, client for large
-        if (file.size <= SERVER_MAX_SIZE) {
-            try {
-                setStatus("uploading");
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("format", format);
-
-                const response = await fetch("/api/convert/video", {
-                    method: "POST",
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    let errorData: any;
-                    try {
-                        errorData = await response.json();
-                    } catch {
-                        const errorText = await response.text();
-                        errorData = { error: errorText };
-                    }
-                    // If server-side unavailable, fall through to client-side
-                    if (errorData.code === "SERVER_SIDE_UNAVAILABLE" || errorData.useClientSide) {
-                        // Fall through to client-side conversion
-                    } else {
-                        throw new Error(errorData.error || "Server-side conversion failed");
-                    }
-                } else {
-                    // Server-side conversion succeeded
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    setResultUrl(url);
-                    setResultFilename(generateOutputFilename(file, format));
-                    setStatus("success");
-                    return;
-                }
-            } catch (error: any) {
-                // If server-side fails, fall back to client-side
-                console.log("Server-side conversion failed, using client-side:", error.message);
-            }
-        }
-
-        // Client-side conversion (for large files or server-side unavailable)
+        // Video conversion is currently client-side only
+        // Server-side conversion is not available (FFmpeg not in Vercel serverless)
+        // Go straight to client-side conversion
         await convertMediaClient(file, format, "video");
     };
 
     const convertAudio = async (file: File, format: string) => {
-        // Check file size - route to server for small files, client for large
-        if (file.size <= SERVER_MAX_SIZE) {
-            try {
-                setStatus("uploading");
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("format", format);
-
-                const response = await fetch("/api/convert/audio", {
-                    method: "POST",
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    let errorData: any;
-                    try {
-                        errorData = await response.json();
-                    } catch {
-                        const errorText = await response.text();
-                        errorData = { error: errorText };
-                    }
-                    // If server-side unavailable, fall through to client-side
-                    if (errorData.code === "SERVER_SIDE_UNAVAILABLE" || errorData.useClientSide) {
-                        // Fall through to client-side conversion
-                    } else {
-                        throw new Error(errorData.error || "Server-side conversion failed");
-                    }
-                } else {
-                    // Server-side conversion succeeded
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    setResultUrl(url);
-                    setResultFilename(generateOutputFilename(file, format));
-                    setStatus("success");
-                    return;
-                }
-            } catch (error: any) {
-                // If server-side fails, fall back to client-side
-                console.log("Server-side conversion failed, using client-side:", error.message);
-            }
-        }
-
-        // Client-side conversion (for large files or server-side unavailable)
+        // Audio conversion is currently client-side only
+        // Server-side conversion is not available (FFmpeg not in Vercel serverless)
+        // Go straight to client-side conversion
         await convertMediaClient(file, format, "audio");
     };
 
@@ -198,24 +134,35 @@ export function useConversion(): UseConversionReturn {
                 throw new Error(`File size (${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB) exceeds the maximum allowed size of ${(CLIENT_MAX_SIZE / 1024 / 1024 / 1024).toFixed(2)}GB for client-side conversion.`);
             }
 
-            const ffmpeg = getFfmpeg();
+            // Load FFmpeg module dynamically
+            const { fetchFile, toBlobURL } = await loadFFmpegModule();
+            const ffmpeg = await getFfmpeg();
 
             if (!ffmpeg.loaded) {
                 setStatus("converting");
-                // Load FFmpeg
-                // Use CDN for now - in production better to host these files
-                const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
-                await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-                });
+                setProgress(10); // Show initial progress
+                
+                try {
+                    // Load FFmpeg with static URLs to avoid dynamic import issues
+                    const coreJsURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.js";
+                    const wasmURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm";
+                    
+                    await ffmpeg.load({
+                        coreURL: await toBlobURL(coreJsURL, "text/javascript"),
+                        wasmURL: await toBlobURL(wasmURL, "application/wasm"),
+                    });
+                    setProgress(20);
+                } catch (loadError: any) {
+                    console.error("FFmpeg load error:", loadError);
+                    throw new Error(`Failed to load FFmpeg. ${loadError.message || "Please refresh the page and try again."}`);
+                }
             }
 
             setStatus("converting");
-            setProgress(0);
+            setProgress(20);
 
-            ffmpeg.on("progress", ({ progress }) => {
-                setProgress(Math.round(progress * 100));
+            ffmpeg.on("progress", ({ progress }: { progress: number }) => {
+                setProgress(Math.round(20 + progress * 80)); // Progress from 20% to 100%
             });
 
             const fileName = "input" + file.name.substring(file.name.lastIndexOf("."));
