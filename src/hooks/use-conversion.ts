@@ -38,11 +38,38 @@ export function useConversion(): UseConversionReturn {
 
     const loadFFmpegModule = async () => {
         if (!ffmpegModuleRef.current) {
-            const [{ FFmpeg }, { fetchFile, toBlobURL }] = await Promise.all([
-                import("@ffmpeg/ffmpeg"),
-                import("@ffmpeg/util")
-            ]);
-            ffmpegModuleRef.current = { FFmpeg, fetchFile, toBlobURL };
+            try {
+                // Use eval to make imports truly dynamic and avoid Turbopack static analysis
+                // This is necessary because Turbopack tries to analyze all imports at build time
+                const importFFmpeg = eval('(specifier) => import(specifier)');
+                
+                // Load modules using the dynamic import function
+                const [ffmpegModule, utilModule] = await Promise.all([
+                    importFFmpeg("@ffmpeg/ffmpeg"),
+                    importFFmpeg("@ffmpeg/util")
+                ]);
+                
+                const { FFmpeg } = ffmpegModule;
+                const { fetchFile, toBlobURL } = utilModule;
+                
+                ffmpegModuleRef.current = { FFmpeg, fetchFile, toBlobURL };
+            } catch (error: any) {
+                console.error("Failed to load FFmpeg modules with eval, trying Function constructor:", error);
+                try {
+                    // Fallback: Use Function constructor
+                    const dynamicImport = new Function('specifier', 'return import(specifier)');
+                    const [ffmpegModule, utilModule] = await Promise.all([
+                        dynamicImport("@ffmpeg/ffmpeg"),
+                        dynamicImport("@ffmpeg/util")
+                    ]);
+                    const { FFmpeg } = ffmpegModule;
+                    const { fetchFile, toBlobURL } = utilModule;
+                    ffmpegModuleRef.current = { FFmpeg, fetchFile, toBlobURL };
+                } catch (fallbackError: any) {
+                    console.error("All FFmpeg loading methods failed:", fallbackError);
+                    throw new Error(`Failed to load FFmpeg: ${fallbackError.message || "Unknown error"}`);
+                }
+            }
         }
         return ffmpegModuleRef.current;
     };
