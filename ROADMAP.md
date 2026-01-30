@@ -1,191 +1,88 @@
-# File Converter - Growth Roadmap
+File Converter - Product Roadmap
+v1 (Live)
 
-## Current Status (v1.0)
+Supported
 
-### ✅ Implemented Features
-- **Image Conversions**: JPG, PNG, WebP, TIFF, AVIF, GIF, SVG
-- **Video Conversions**: MP4, MOV, AVI, MKV, WebM
-- **Audio Conversions**: MP3, WAV, AAC, FLAC, OGG
-- **Document Conversions**: PDF, DOCX, TXT, RTF (basic support)
-- **Smart Format Detection**: Automatic highlighting of supported conversion formats
-- **Proper File Naming**: Original filename preserved with new extension
+Images: JPG, PNG, WebP, TIFF, AVIF, GIF, SVG
 
-## Phase 1: Enhanced Document Support (Q1 2025)
+Video: MP4, MOV, AVI, MKV, WebM
 
-### Priority: High
-- [ ] **PDF to DOCX Conversion**
-  - Implement using `pdf-parse` and `docx` libraries
-  - Support text extraction and formatting preservation
-  - Handle multi-page documents
+Audio: MP3, WAV, AAC, FLAC, OGG
 
-- [ ] **DOCX to PDF Conversion**
-  - Implement using `mammoth` or `docx` libraries
-  - Preserve formatting, images, and tables
-  - Support complex document structures
+Docs: PDF, DOCX, TXT, RTF (basic)
 
-- [ ] **Enhanced TXT Conversions**
-  - TXT to DOCX with formatting
-  - TXT to RTF with styling
-  - Better encoding detection (UTF-8, ASCII, etc.)
+Core
 
-- [ ] **RTF Full Support**
-  - RTF to PDF with formatting
-  - RTF to DOCX conversion
-  - RTF parsing improvements
+Smart format detection
 
-### Technical Requirements
-- Install: `pdf-parse`, `mammoth`, `docx`
-- Server-side processing for document conversions
-- Memory optimization for large documents
+Keeps original file names
 
-## Phase 2: Additional Document Formats (Q2 2025)
+Phase 1 - Better Docs
 
-### Priority: Medium
-- [ ] **XLSX Support**
-  - XLSX to PDF
-  - XLSX to CSV
-  - XLSX to XLS (legacy)
+PDF → DOCX
 
-- [ ] **PPTX Support**
-  - PPTX to PDF
-  - PPTX to images (per slide)
-  - PPTX to video (presentation)
+DOCX → PDF
 
-- [ ] **ODT/ODS Support** (OpenDocument)
-  - ODT to DOCX/PDF
-  - ODS to XLSX/CSV
+TXT → DOCX / RTF
 
-- [ ] **EPUB Support**
-  - EPUB to PDF
-  - EPUB to TXT
-  - EPUB to MOBI
+Full RTF support
 
-### Technical Requirements
-- Install: `xlsx`, `pptx`, `epub-gen`
-- Consider cloud processing for large files
+Focus: formatting, multi-page handling, stable exports.
 
-## Phase 3: Advanced Image Features (Q2-Q3 2025)
+Phase 2 - Office Files
 
-### Priority: Medium
-- [ ] **Image Optimization**
-  - Compression options
-  - Quality settings
-  - Resize options
+XLSX → PDF / CSV
 
-- [ ] **Batch Image Conversion**
-  - Multiple files at once
-  - Progress tracking per file
-  - ZIP download for batch results
+PPTX → PDF / Images
 
-- [ ] **Image Editing**
-  - Crop, rotate, flip
-  - Add watermarks
-  - Adjust brightness/contrast
+ODT / ODS → DOCX / XLSX
 
-- [ ] **HEIC/HEIF Support**
-  - iPhone image format support
-  - HEIC to JPG/PNG conversion
+EPUB → PDF / TXT
 
-### Technical Requirements
-- Enhanced Sharp usage
-- Client-side image manipulation library
-- Batch processing API
+Focus: real productivity files, not just media.
 
-## Phase 4: Advanced Video Features (Q3 2025)
+Phase 3 - Images
 
-### Priority: Low
-- [ ] **Video Compression**
-  - Quality/bitrate settings
-  - Resolution options
-  - Codec selection
+Compression + resize
 
-- [ ] **Video Editing**
-  - Trim/cut videos
-  - Extract audio
-  - Merge videos
+Batch uploads + ZIP export
 
-- [ ] **Video to GIF**
-  - Convert video segments to animated GIF
-  - Frame rate control
-  - Quality settings
+Crop, rotate, watermark
 
-- [ ] **Additional Video Formats**
-  - FLV, WMV, 3GP support
-  - 4K/8K video handling
+HEIC support
 
-### Technical Requirements
-- Enhanced FFmpeg configuration
-- Server-side video processing (for large files)
-- Cloud storage for temporary files
+Focus: speed + creator workflows.
 
-## Phase 5: Archive Support (Q4 2025)
+Phase 4 - Video
 
-### Priority: Low
-- [ ] **ZIP Support**
-  - Create ZIP files
-  - Extract ZIP files
-  - Convert between archive formats
+Compress + resize
 
-- [ ] **RAR Support**
-  - Extract RAR files
-  - RAR to ZIP conversion
+Trim, merge, extract audio
 
-- [ ] **7Z/TAR Support**
-  - Extract and create archives
-  - Format conversion
+Video → GIF
 
-### Technical Requirements
-- Install: `yauzl`, `yazl`, `node-7z`, `tar`
-- Server-side processing for security
+More formats (FLV, WMV, 3GP)
 
-## Phase 6: Cloud & Enterprise Features (2026)
+Focus: practical editing, not heavy studio tools.
 
-### Priority: Very Low
-- [ ] **Cloud Storage Integration**
-  - Direct upload from Google Drive, Dropbox
-  - Save converted files to cloud
-  - Share links
+Phase 5 - Archives
 
-- [ ] **API Access**
-  - REST API for developers
-  - Webhook support
-  - Rate limiting
+ZIP create/extract
 
-- [ ] **Enterprise Features**
-  - Bulk processing
-  - Custom branding
-  - Analytics dashboard
+RAR → ZIP
 
-## Technical Debt & Improvements
+7Z / TAR support
 
-### Immediate
-- [ ] Improve error handling and user feedback
-- [ ] Add file size limits per format
-- [ ] Implement progress tracking for large files
-- [ ] Add conversion history (localStorage)
+Focus: basic archive handling inside the same tool.
 
-### Short-term
-- [ ] Performance optimization
-- [ ] Better mobile experience
-- [ ] Accessibility improvements
-- [ ] Internationalization (i18n)
+Phase 6 - Platform
 
-### Long-term
-- [ ] Serverless function optimization
-- [ ] CDN integration for faster downloads
-- [ ] Advanced caching strategies
-- [ ] Monitoring and analytics
+Google Drive / Dropbox import
 
-## Success Metrics
+Public API
 
-- **User Engagement**: Conversion completion rate > 80%
-- **Performance**: Average conversion time < 10 seconds
-- **Reliability**: Success rate > 95%
-- **User Satisfaction**: Positive feedback > 4.5/5
+Bulk processing
 
-## Notes
+Analytics + branding
 
-- All conversions should maintain original file naming
-- Privacy-first: No file storage, auto-delete after 30 minutes
-- Progressive enhancement: Basic features work without JavaScript
-- Mobile-first design for all new features
+Focus: turn converter into a platform.

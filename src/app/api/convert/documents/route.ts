@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
         headers.set("Content-Type", contentType);
         headers.set("Content-Disposition", `attachment; filename="${outputFilename}"`);
 
-        return new NextResponse(convertedBuffer, {
+        return new NextResponse(convertedBuffer as any, {
             status: 200,
             headers,
         });
