@@ -8,6 +8,10 @@ import { generateOutputFilename } from "@/lib/conversion-matrix";
 
 export type ConversionStatus = "idle" | "uploading" | "converting" | "success" | "error";
 
+// File size limits
+const SERVER_MAX_SIZE = 4 * 1024 * 1024; // 4MB for server-side processing
+const CLIENT_MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2GB (browser limit)
+
 interface UseConversionReturn {
     status: ConversionStatus;
     progress: number;
@@ -55,10 +59,28 @@ export function useConversion(): UseConversionReturn {
             });
 
             if (!response.ok) {
-                throw new Error(await response.text());
+                const errorText = await response.text();
+                let errorData;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch {
+                    errorData = { error: errorText };
+                }
+                
+                // Provide specific error messages
+                if (errorData.code === "FILE_TOO_LARGE") {
+                    toast.error(errorData.error || "File is too large for conversion");
+                } else if (errorData.code === "UNSUPPORTED_FORMAT") {
+                    toast.error(errorData.error || "Unsupported image format");
+                } else if (errorData.code === "INVALID_IMAGE_FORMAT") {
+                    toast.error(errorData.error || "Invalid image file");
+                } else {
+                    toast.error(errorData.error || "Failed to convert image");
+                }
+                throw new Error(errorData.error || errorText);
             }
 
-            setStatus("converting"); // actually it's done mainly
+            setStatus("converting");
             setProgress(100);
 
             const blob = await response.blob();
@@ -66,15 +88,104 @@ export function useConversion(): UseConversionReturn {
             setResultUrl(url);
             setResultFilename(generateOutputFilename(file, format));
             setStatus("success");
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
             setStatus("error");
-            toast.error("Failed to convert image");
+            if (!error.message || !error.message.includes("Failed to convert")) {
+                toast.error(error.message || "Failed to convert image");
+            }
         }
     };
 
-    const convertMedia = async (file: File, format: string) => {
+    const convertVideo = async (file: File, format: string) => {
+        // Check file size - route to server for small files, client for large
+        if (file.size <= SERVER_MAX_SIZE) {
+            try {
+                setStatus("uploading");
+                const formData = new FormData();
+                formData.append("file", file);
+                formData.append("format", format);
+
+                const response = await fetch("/api/convert/video", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: await response.text() }));
+                    // If server-side unavailable, fall through to client-side
+                    if (errorData.code === "SERVER_SIDE_UNAVAILABLE" || errorData.useClientSide) {
+                        // Fall through to client-side conversion
+                    } else {
+                        throw new Error(errorData.error || "Server-side conversion failed");
+                    }
+                } else {
+                    // Server-side conversion succeeded
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    setResultUrl(url);
+                    setResultFilename(generateOutputFilename(file, format));
+                    setStatus("success");
+                    return;
+                }
+            } catch (error: any) {
+                // If server-side fails, fall back to client-side
+                console.log("Server-side conversion failed, using client-side:", error.message);
+            }
+        }
+
+        // Client-side conversion (for large files or server-side unavailable)
+        await convertMediaClient(file, format, "video");
+    };
+
+    const convertAudio = async (file: File, format: string) => {
+        // Check file size - route to server for small files, client for large
+        if (file.size <= SERVER_MAX_SIZE) {
+            try {
+                setStatus("uploading");
+                const formData = new FormData();
+                formData.append("file", file);
+                formData.append("format", format);
+
+                const response = await fetch("/api/convert/audio", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: await response.text() }));
+                    // If server-side unavailable, fall through to client-side
+                    if (errorData.code === "SERVER_SIDE_UNAVAILABLE" || errorData.useClientSide) {
+                        // Fall through to client-side conversion
+                    } else {
+                        throw new Error(errorData.error || "Server-side conversion failed");
+                    }
+                } else {
+                    // Server-side conversion succeeded
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    setResultUrl(url);
+                    setResultFilename(generateOutputFilename(file, format));
+                    setStatus("success");
+                    return;
+                }
+            } catch (error: any) {
+                // If server-side fails, fall back to client-side
+                console.log("Server-side conversion failed, using client-side:", error.message);
+            }
+        }
+
+        // Client-side conversion (for large files or server-side unavailable)
+        await convertMediaClient(file, format, "audio");
+    };
+
+    const convertMediaClient = async (file: File, format: string, mediaType: "video" | "audio") => {
         try {
+            // Check file size limit for client-side
+            if (file.size > CLIENT_MAX_SIZE) {
+                throw new Error(`File size (${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB) exceeds the maximum allowed size of ${(CLIENT_MAX_SIZE / 1024 / 1024 / 1024).toFixed(2)}GB for client-side conversion.`);
+            }
+
             const ffmpeg = getFfmpeg();
 
             if (!ffmpeg.loaded) {
@@ -146,12 +257,27 @@ export function useConversion(): UseConversionReturn {
             setResultUrl(url);
             setResultFilename(generateOutputFilename(file, format));
             setStatus("success");
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            // setStatus("error"); // removed to allow retry or inspection? No, should be error.
             setStatus("error");
-            toast.error("Failed to convert media");
+            
+            // Provide specific error messages
+            if (error.message?.includes("File size")) {
+                toast.error(error.message);
+            } else if (error.message?.includes("timeout") || error.message?.includes("timed out")) {
+                toast.error("Conversion timed out. The file may be too large or complex. Please try a smaller file.");
+            } else if (error.message?.includes("not supported") || error.message?.includes("unsupported")) {
+                toast.error("This conversion is not supported. Please try a different format.");
+            } else {
+                toast.error(`Failed to convert ${mediaType}. ${error.message || "Please try again."}`);
+            }
         }
+    };
+
+    // Keep convertMedia for backward compatibility
+    const convertMedia = async (file: File, format: string) => {
+        const mediaType = file.type.startsWith("video/") ? "video" : "audio";
+        await convertMediaClient(file, format, mediaType);
     };
 
     const convertPdf = async (file: File) => {
@@ -239,11 +365,15 @@ export function useConversion(): UseConversionReturn {
                 await convertMedia(file, targetFormat);
             }
         } 
-        // Video/Audio conversions
-        else if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
-            await convertMedia(file, targetFormat);
+        // Video conversions
+        else if (file.type.startsWith("video/")) {
+            await convertVideo(file, targetFormat);
+        }
+        // Audio conversions
+        else if (file.type.startsWith("audio/")) {
+            await convertAudio(file, targetFormat);
         } else {
-            toast.error("Unsupported conversion combination");
+            toast.error("Unsupported conversion combination. Please select a supported file type and format.");
             setStatus("error");
         }
     };
