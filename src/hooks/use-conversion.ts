@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { toast } from "sonner";
+import { generateOutputFilename } from "@/lib/conversion-matrix";
 
 export type ConversionStatus = "idle" | "uploading" | "converting" | "success" | "error";
 
@@ -63,7 +64,7 @@ export function useConversion(): UseConversionReturn {
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             setResultUrl(url);
-            setResultFilename(`converted.${format}`);
+            setResultFilename(generateOutputFilename(file, format));
             setStatus("success");
         } catch (error) {
             console.error(error);
@@ -97,14 +98,53 @@ export function useConversion(): UseConversionReturn {
             const fileName = "input" + file.name.substring(file.name.lastIndexOf("."));
             await ffmpeg.writeFile(fileName, await fetchFile(file));
 
-            await ffmpeg.exec(["-i", fileName, `output.${format}`]);
+            // Build FFmpeg command with appropriate codecs
+            const outputFile = `output.${format}`;
+            let ffmpegArgs: string[] = ["-i", fileName];
+            
+            // Audio codecs
+            if (format === "mp3") {
+              ffmpegArgs.push("-acodec", "libmp3lame", "-q:a", "2");
+            } else if (format === "wav") {
+              ffmpegArgs.push("-acodec", "pcm_s16le");
+            } else if (format === "aac") {
+              ffmpegArgs.push("-acodec", "aac", "-b:a", "192k");
+            } else if (format === "flac") {
+              ffmpegArgs.push("-acodec", "flac");
+            } else if (format === "ogg") {
+              ffmpegArgs.push("-acodec", "libvorbis");
+            }
+            // Video codecs
+            else if (format === "mp4") {
+              ffmpegArgs.push("-c:v", "libx264", "-preset", "medium", "-crf", "23", "-c:a", "aac", "-b:a", "192k");
+            } else if (format === "mov") {
+              ffmpegArgs.push("-c:v", "libx264", "-preset", "medium", "-crf", "23", "-c:a", "aac", "-b:a", "192k");
+            } else if (format === "avi") {
+              ffmpegArgs.push("-c:v", "libx264", "-c:a", "mp3");
+            } else if (format === "mkv") {
+              ffmpegArgs.push("-c:v", "libx264", "-c:a", "aac");
+            } else if (format === "webm") {
+              ffmpegArgs.push("-c:v", "libvpx-vp9", "-c:a", "libopus");
+            }
+            
+            ffmpegArgs.push(outputFile);
+            await ffmpeg.exec(ffmpegArgs);
 
             const data = await ffmpeg.readFile(`output.${format}`) as Uint8Array;
-            const blob = new Blob([data as any], { type: `audio/${format}` }); // Adjust type dynamically if video
+            
+            // Determine MIME type based on format
+            let mimeType = `audio/${format}`;
+            if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(format)) {
+              mimeType = `video/${format}`;
+            } else if (['mp3', 'wav', 'aac', 'flac', 'ogg'].includes(format)) {
+              mimeType = `audio/${format === 'mp3' ? 'mpeg' : format}`;
+            }
+            
+            const blob = new Blob([data as any], { type: mimeType });
             const url = URL.createObjectURL(blob);
 
             setResultUrl(url);
-            setResultFilename(`converted.${format}`);
+            setResultFilename(generateOutputFilename(file, format));
             setStatus("success");
         } catch (error) {
             console.error(error);
@@ -136,7 +176,7 @@ export function useConversion(): UseConversionReturn {
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             setResultUrl(url);
-            setResultFilename(`converted.pdf`);
+            setResultFilename(generateOutputFilename(file, "pdf"));
             setStatus("success");
         } catch (error) {
             console.error(error);
@@ -145,23 +185,62 @@ export function useConversion(): UseConversionReturn {
         }
     }
 
+    const convertDocument = async (file: File, format: string) => {
+        try {
+            setStatus("uploading");
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("format", format);
+
+            const response = await fetch("/api/convert/documents", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText);
+            }
+
+            setStatus("converting");
+            setProgress(100);
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            setResultUrl(url);
+            setResultFilename(generateOutputFilename(file, format));
+            setStatus("success");
+        } catch (error) {
+            console.error(error);
+            setStatus("error");
+            toast.error("Failed to convert document");
+        }
+    };
+
     const convert = async (file: File, targetFormat: string) => {
         reset();
 
-        // Determine strategy
-        if (targetFormat === 'pdf' && file.type.startsWith("image/")) {
+        // Document conversions
+        if (file.type.includes("pdf") || file.name.toLowerCase().endsWith(".pdf") ||
+            file.type.includes("wordprocessingml") || file.name.toLowerCase().endsWith(".docx") ||
+            file.type.includes("text/plain") || file.name.toLowerCase().endsWith(".txt") ||
+            file.type.includes("rtf") || file.name.toLowerCase().endsWith(".rtf")) {
+            await convertDocument(file, targetFormat);
+        }
+        // Image to PDF
+        else if (targetFormat === 'pdf' && file.type.startsWith("image/")) {
             await convertPdf(file);
-        } else if (file.type.startsWith("image/") || ["gif", "tiff", "avif", "webp", "jpg", "jpeg", "png"].includes(targetFormat)) {
-            // Note: Simplification - if input is image OR target is image, we try server.
-            // But we only support Image -> Image on server. 
-            // If input is video -> image, that's FFmpeg (WASM).
-
+        } 
+        // Image conversions
+        else if (file.type.startsWith("image/") || ["gif", "tiff", "avif", "webp", "jpg", "jpeg", "png", "svg"].includes(targetFormat)) {
             if (file.type.startsWith("image/")) {
                 await convertImage(file, targetFormat);
             } else {
                 await convertMedia(file, targetFormat);
             }
-        } else if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
+        } 
+        // Video/Audio conversions
+        else if (file.type.startsWith("video/") || file.type.startsWith("audio/")) {
             await convertMedia(file, targetFormat);
         } else {
             toast.error("Unsupported conversion combination");

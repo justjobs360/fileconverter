@@ -183,6 +183,7 @@ export default function Home() {
 
                       {selectedFile && (
                         <FormatSelector
+                          selectedFile={selectedFile}
                           selectedFormat={selectedFormat}
                           onSelectFormat={setSelectedFormat}
                         />

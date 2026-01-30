@@ -16,6 +16,11 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Generate output filename
+        const originalName = file.name;
+        const nameWithoutExt = originalName.replace(/\.[^/.]+$/, '');
+        const outputFilename = `${nameWithoutExt}.pdf`;
+
         // Validate input file is an image
         if (!file.type.startsWith("image/")) {
             return NextResponse.json(
@@ -59,7 +64,7 @@ export async function POST(req: NextRequest) {
         // Return bytes
         const headers = new Headers();
         headers.set("Content-Type", "application/pdf");
-        headers.set("Content-Disposition", `attachment; filename="converted.pdf"`);
+        headers.set("Content-Disposition", `attachment; filename="${outputFilename}"`);
 
         return new NextResponse(pdfBytes as any, {
             status: 200,
