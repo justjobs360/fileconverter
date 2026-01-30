@@ -112,7 +112,13 @@ export function useConversion(): UseConversionReturn {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: await response.text() }));
+                    let errorData: any;
+                    try {
+                        errorData = await response.json();
+                    } catch {
+                        const errorText = await response.text();
+                        errorData = { error: errorText };
+                    }
                     // If server-side unavailable, fall through to client-side
                     if (errorData.code === "SERVER_SIDE_UNAVAILABLE" || errorData.useClientSide) {
                         // Fall through to client-side conversion
@@ -153,7 +159,13 @@ export function useConversion(): UseConversionReturn {
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ error: await response.text() }));
+                    let errorData: any;
+                    try {
+                        errorData = await response.json();
+                    } catch {
+                        const errorText = await response.text();
+                        errorData = { error: errorText };
+                    }
                     // If server-side unavailable, fall through to client-side
                     if (errorData.code === "SERVER_SIDE_UNAVAILABLE" || errorData.useClientSide) {
                         // Fall through to client-side conversion
