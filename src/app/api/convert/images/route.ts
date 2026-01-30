@@ -27,17 +27,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const buffer = Buffer.from(await file.arrayBuffer());
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer) as Buffer;
         let convertedBuffer: Buffer | undefined;
 
         // Handle SVG input - convert to PNG first if needed
         const isSvgInput = file.type.includes("svg") || file.name.toLowerCase().endsWith(".svg");
-        let inputBuffer = buffer;
+        let inputBuffer: Buffer = buffer;
         
         if (isSvgInput && format.toLowerCase() !== "svg") {
             // SVG needs to be converted to a raster format first
             // Sharp can handle SVG, but we need to specify dimensions
-            inputBuffer = await sharp(buffer, { density: 300 })
+            inputBuffer = await sharp(buffer as any, { density: 300 })
                 .resize(2000, 2000, { fit: 'inside', withoutEnlargement: true })
                 .png()
                 .toBuffer();
